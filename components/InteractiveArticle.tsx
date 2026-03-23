@@ -84,10 +84,13 @@ export default function InteractiveArticle({
            body: JSON.stringify({ text, voice: voiceName })
          });
          
-         if (!res.ok) throw new Error("Cloud TTS Failed");
+         const responseData = await res.json();
          
-         const { audioContent, error } = await res.json();
-         if (error) throw new Error(error);
+         if (!res.ok) {
+           throw new Error(responseData.error || responseData.details?.error?.message || "Cloud TTS API 請求失敗");
+         }
+         
+         const { audioContent } = responseData;
          
          if (!audioContent) throw new Error("No audio content received from API");
 
