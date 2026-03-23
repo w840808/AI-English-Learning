@@ -42,8 +42,50 @@ export default function ReaderApp() {
   };
 
   const [isLoading, setIsLoading] = useState(false);
-  const [articleData, setArticleData] = useState<any>(defaultArticle);
+  const [articleData, setArticleData] = useState<any>(null); // Start with null to allow loading from storage
   const [error, setError] = useState("");
+
+  // Hydration & Persistence Logic
+  useEffect(() => {
+    // 1. Load Settings
+    const savedDiff = localStorage.getItem("ai-radio-difficulty");
+    const savedTopic = localStorage.getItem("ai-radio-topic");
+    const savedKeywords = localStorage.getItem("ai-radio-keywords");
+    const savedWordCount = localStorage.getItem("ai-radio-wordcount");
+    
+    if (savedDiff) setDifficulty(savedDiff);
+    if (savedTopic) setTopic(savedTopic);
+    if (savedKeywords) setKeywords(savedKeywords);
+    if (savedWordCount) setWordCount(savedWordCount);
+
+    // 2. Load Last Article
+    const savedArticle = localStorage.getItem("ai-radio-last-article");
+    if (savedArticle) {
+      try {
+        setArticleData(JSON.parse(savedArticle));
+      } catch (e) {
+        console.error("Failed to parse saved article", e);
+        setArticleData(defaultArticle);
+      }
+    } else {
+      setArticleData(defaultArticle);
+    }
+  }, []);
+
+  // Save Settings Effect
+  useEffect(() => {
+    localStorage.setItem("ai-radio-difficulty", difficulty);
+    localStorage.setItem("ai-radio-topic", topic);
+    localStorage.setItem("ai-radio-keywords", keywords);
+    localStorage.setItem("ai-radio-wordcount", wordCount);
+  }, [difficulty, topic, keywords, wordCount]);
+
+  // Save Article Effect
+  useEffect(() => {
+    if (articleData && articleData !== defaultArticle) {
+      localStorage.setItem("ai-radio-last-article", JSON.stringify(articleData));
+    }
+  }, [articleData]);
 
   // UI Tabs & Features
   const [activeTab, setActiveTab] = useState<"generator" | "notebook">("generator");
