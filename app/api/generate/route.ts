@@ -1,20 +1,4 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { generateObject } from 'ai';
-import { z } from 'zod';
-
-// We define the expected JSON schema using Zod
-// This enforces the model to return the structure we need
-const ArticleSchema = z.object({
-  title: z.string().describe("The localized or original title of the article"),
-  paragraphs: z.array(z.object({
-    english: z.string().describe("A single paragraph in English"),
-    chinese: z.string().describe("The Traditional Chinese translation of this exact paragraph")
-  })).describe("The generated article broken down into aligned bilingual paragraphs"),
-  grammar_analysis: z.array(z.object({
-    sentence: z.string().describe("An exact sentence extracted from the English text"),
-    explanation: z.string().describe("Traditional Chinese detailed explanation of the grammar structure in this sentence")
-  }))
-});
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: Request) {
   try {
@@ -25,9 +9,11 @@ export async function POST(req: Request) {
       return new Response(JSON.stringify({ error: "Server API Key is not configured" }), { status: 500 });
     }
 
-    // Initialize custom google provider with the backend API key
-    const google = createGoogleGenerativeAI({
-      apiKey: apiKey,
+    const genAI = new GoogleGenerativeAI(apiKey);
+    // Use the latest and fastest model with Google Search grounding
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash",
+      tools: [{ googleSearchRetrieval: {} }]
     });
 
     const keywordInstruction = keywords && keywords.trim().length > 0 
@@ -41,22 +27,35 @@ export async function POST(req: Request) {
       ${keywordInstruction}
       
       CRITICAL INSTRUCTIONS FOR CONTENT QUALITY:
+      - USE SEARCH GROUNDING: You have access to real-time Google Search results. Please prioritize using up-to-date data, events, and trends from March 2026 to ensure the article is timely and accurate.
       - Treat this like responding directly to a user's prompt or question. Be analytical, informative, and objective like a standard AI assistant, providing real insights and structural analysis.
-      - The category (${topic}) is just the general domain. DO NOT explicitly mention or introduce the category name in the article itself (e.g., do not write "In the field of ${topic}..."). Just write naturally about the subject.
-      - Do NOT write vague, generic, or "fluff" content. Include concrete facts, real-world examples, or recent trends to support your analysis.
+      - The category (${topic}) is just the general domain. DO NOT explicitly mention or introduce the category name in the article itself.
+      - Do NOT write vague, generic, or "fluff" content. Include concrete facts, real-world examples, or recent trends from early 2026 to support your analysis.
       - Maintain a professional, informative, and practical tone.
       
-      You must return pure JSON matching the schema pattern.
+      You must return pure JSON that exactly matches this schema:
+      {
+        "title": "...",
+        "paragraphs": [
+          { "english": "...", "chinese": "..." }
+        ],
+        "grammar_analysis": [
+          { "sentence": "...", "explanation": "..." }
+        ]
+      }
+      
       For the grammar_analysis portion, select 3 key grammatically interesting sentences from the English text exactly as they appear, and provide a detailed explanation in Traditional Chinese for each.
     `;
 
-    const result = await generateObject({
-      model: google('gemini-2.5-flash'),
-      schema: ArticleSchema,
-      prompt: prompt,
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+      }
     });
 
-    return new Response(JSON.stringify(result.object), {
+    const responseText = result.response.text();
+    return new Response(responseText, {
         headers: { "Content-Type": "application/json" }
     });
 
