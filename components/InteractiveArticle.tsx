@@ -110,14 +110,12 @@ export default function InteractiveArticle({
          audio.playbackRate = playbackSpeed;
          
          audio.onended = () => {
-            console.log("Playback ended");
             stopPlaying();
             URL.revokeObjectURL(audioUrl);
          };
          
          audio.onerror = (e) => {
             console.error("Audio Playback Error:", e);
-            alert("播放失敗: 音訊格式錯誤或載入失敗");
             stopPlaying();
          };
          
@@ -125,7 +123,6 @@ export default function InteractiveArticle({
          setIsCloudLoading(false);
        } catch (err: any) {
          console.error("Cloud TTS Playback Error:", err);
-         alert(`語音合成失敗: ${err.message}\n請檢查 Google Cloud Console 端的 API 是否已啟用，或 API Key 是否正確。`);
          setIsCloudLoading(false);
          setPlayingParaIndex(null);
        }
