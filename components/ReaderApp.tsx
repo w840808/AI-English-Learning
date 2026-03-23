@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { BookOpen, Settings, PlayCircle, Loader2, BookMarked, X, LogOut, User } from "lucide-react";
+import { BookOpen, Settings, PlayCircle, Loader2, BookMarked, X, LogOut, User, Menu, ChevronLeft, ChevronRight } from "lucide-react";
 import InteractiveArticle from "./InteractiveArticle";
 import { createSupabaseClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
@@ -48,6 +48,20 @@ export default function ReaderApp() {
   // UI Tabs & Features
   const [activeTab, setActiveTab] = useState<"generator" | "notebook">("generator");
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isGrammarOpen, setIsGrammarOpen] = useState(false);
+
+  // Close sidebars on resize if large screen
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setIsSidebarOpen(false);
+        setIsGrammarOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Notebook States
   const [savedWords, setSavedWords] = useState<any[]>([]);
@@ -234,13 +248,29 @@ export default function ReaderApp() {
   return (
     <div className="flex w-full h-screen overflow-hidden bg-stone-50 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-50 relative selection:bg-indigo-200 dark:selection:bg-indigo-900/50 selection:text-indigo-900 dark:selection:text-indigo-100">
       
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Left Sidebar - Controls */}
-      <aside className="w-64 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col h-full shrink-0 z-10 shadow-sm relative">
+      <aside className={`
+        fixed lg:static inset-y-0 left-0 z-50 w-64 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col h-full shrink-0 shadow-sm transition-transform duration-300 transform
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
         <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
-          <h1 className="text-xl font-bold flex items-center gap-2 text-zinc-900 dark:text-zinc-50">
-            <PlayCircle className="w-6 h-6 text-indigo-500" />
-            AI Radio
-          </h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-bold flex items-center gap-2 text-zinc-900 dark:text-zinc-50">
+              <PlayCircle className="w-6 h-6 text-indigo-500" />
+              AI Radio
+            </h1>
+            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 text-zinc-400">
+              <X className="w-5 h-5"/>
+            </button>
+          </div>
           <p className="text-sm text-zinc-500 mt-1 dark:text-zinc-400">Your tailored English lessons</p>
           
           <div className="mt-4 flex items-center justify-between bg-zinc-50 dark:bg-zinc-800/50 p-2 rounded-lg border border-zinc-200 dark:border-zinc-800">
@@ -382,11 +412,22 @@ export default function ReaderApp() {
 
       {/* Main Content - Reader / Notebook */}
       <main className="flex-1 overflow-y-auto relative bg-stone-50 dark:bg-zinc-950">
+        {/* Mobile Header */}
+        <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md sticky top-0 z-30">
+           <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-zinc-600 dark:text-zinc-400">
+              <Menu className="w-6 h-6" />
+           </button>
+           <h1 className="font-serif font-bold text-lg">AI Radio</h1>
+           <button onClick={() => setIsGrammarOpen(true)} className="p-2 text-zinc-600 dark:text-zinc-400">
+              <BookOpen className="w-6 h-6" />
+           </button>
+        </header>
+
         {activeTab === "notebook" ? (
-          <div className="max-w-5xl mx-auto py-12 px-8 sm:px-12">
-            <h1 className="text-3xl font-bold font-serif mb-12 text-zinc-900 dark:text-zinc-50">Your Learning Notebook</h1>
+          <div className="max-w-5xl mx-auto py-8 lg:py-12 px-4 sm:px-12">
+            <h1 className="text-2xl lg:text-3xl font-bold font-serif mb-8 lg:mb-12 text-zinc-900 dark:text-zinc-50">Your Learning Notebook</h1>
             
-            <section className="mb-16">
+            <section className="mb-12 lg:mb-16">
               <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><BookOpen className="w-5 h-5 text-indigo-500"/> Saved Articles & Stories</h2>
               {savedArticles.length === 0 ? (
                  <p className="text-zinc-500 text-sm">No articles saved yet.</p>
@@ -403,7 +444,7 @@ export default function ReaderApp() {
                                   e.stopPropagation();
                                   removeArticle(article.title);
                                 }}
-                                className="p-1 text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                className="p-1 text-zinc-400 hover:text-red-500 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                                 <X className="w-4 h-4"/>
                              </button>
                            </div>
@@ -424,7 +465,7 @@ export default function ReaderApp() {
                         <div key={i} className="p-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl relative group hover:shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-900">
                             <button 
                                 onClick={() => removeWord(word.wordOrPhrase)}
-                                className="absolute top-3 right-3 p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-md text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                className="absolute top-3 right-3 p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-md text-zinc-400 hover:text-red-500 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                                 <X className="w-4 h-4"/>
                             </button>
                             <div className="flex items-baseline gap-2 mb-1 pr-6">
@@ -443,14 +484,14 @@ export default function ReaderApp() {
             </section>
           </div>
         ) : (
-          <div className="max-w-5xl mx-auto py-12 px-8 sm:px-12">
+          <div className="max-w-5xl mx-auto py-8 lg:py-12 px-4 sm:px-12">
             {/* Header Controls */}
-            <div className="flex justify-between items-center mb-12 pb-4 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 bg-stone-50/90 dark:bg-zinc-950/90 py-4 z-10 backdrop-blur-sm -mt-4">
+            <div className="flex justify-between items-center mb-8 lg:mb-12 pb-4 border-b border-zinc-200 dark:border-zinc-800 sticky top-12 lg:top-0 bg-stone-50/90 dark:bg-zinc-950/90 py-4 z-10 backdrop-blur-sm -mt-4">
                <div className="flex gap-4">
                    <button className="text-sm px-2 py-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Aa</button>
                </div>
                <div className="flex gap-4 items-center">
-                   <span className="text-sm font-medium whitespace-nowrap">Show Translation</span>
+                   <span className="text-xs sm:text-sm font-medium whitespace-nowrap">Show Translation</span>
                    <button 
                       onClick={() => setShowTranslation(!showTranslation)}
                       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${showTranslation ? 'bg-indigo-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}>
@@ -506,12 +547,24 @@ export default function ReaderApp() {
       </main>
 
       {/* Right Sidebar - Grammar */}
-      <aside className="w-80 border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col h-full shrink-0 shadow-sm relative z-10">
-         <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+      {isGrammarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
+          onClick={() => setIsGrammarOpen(false)}
+        />
+      )}
+      <aside className={`
+        fixed lg:static inset-y-0 right-0 z-50 w-80 border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col h-full shrink-0 shadow-sm transition-transform duration-300 transform
+        ${isGrammarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
+      `}>
+         <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 shrink-0 flex items-center justify-between">
           <h2 className="font-semibold flex items-center gap-2">
              <BookOpen className="w-5 h-5 text-indigo-500" />
              Grammar & Dictionary
           </h2>
+          <button onClick={() => setIsGrammarOpen(false)} className="lg:hidden p-1 text-zinc-400">
+            <X className="w-5 h-5"/>
+          </button>
         </div>
         <div className="p-6 flex-1 overflow-y-auto space-y-8">
             {isDefining && (

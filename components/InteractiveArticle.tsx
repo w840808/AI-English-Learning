@@ -197,10 +197,10 @@ export default function InteractiveArticle({
         const isPlaying = playingParaIndex === idx;
 
         return (
-          <div key={idx} className={`grid ${showTranslation ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 max-w-3xl mx-auto'} gap-8 group relative`}>
+          <div key={idx} className={`grid ${showTranslation ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 max-w-3xl mx-auto'} gap-6 md:gap-8 group relative`}>
              
-            {/* Play Button - shown on hover next to paragraph */}
-            <div className="absolute -left-10 top-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* Play Button - responsive positioning */}
+            <div className="absolute -left-12 lg:-left-10 top-1 hidden lg:block opacity-0 group-hover:opacity-100 transition-opacity">
               <button 
                 onClick={() => isPlaying ? stopPlaying() : playParagraph(para.english, idx)}
                 className="p-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-indigo-600 dark:hover:text-indigo-400">
@@ -212,14 +212,27 @@ export default function InteractiveArticle({
               </button>
             </div>
 
+            {/* Mobile Play Button - shown inline */}
+            <div className="lg:hidden flex items-center gap-2 mb-1">
+               <button 
+                onClick={() => isPlaying ? stopPlaying() : playParagraph(para.english, idx)}
+                className="flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
+                {isPlaying ? (
+                   <><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Stop</>
+                ) : (
+                   <><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Listen</>
+                )}
+              </button>
+            </div>
+
             {/* English Side */}
-            <div className={`font-serif text-zinc-900 dark:text-zinc-100 leading-relaxed text-lg ${isPlaying ? '' : ''}`}>
+            <div className={`font-serif text-zinc-900 dark:text-zinc-100 leading-relaxed text-base md:text-lg`}>
               {renderAnnotatedText(para.english, idx)}
             </div>
 
             {/* Chinese Side */}
             {showTranslation && (
-              <div className="font-serif text-zinc-500 dark:text-zinc-400 leading-relaxed text-[0.95em] border-l-2 border-indigo-100 dark:border-indigo-900/50 pl-6 flex items-center">
+              <div className="font-serif text-zinc-500 dark:text-zinc-400 leading-relaxed text-[0.9em] md:text-[0.95em] border-l-2 border-indigo-100 dark:border-indigo-900/50 pl-4 md:pl-6 flex items-center">
                   {para.chinese}
               </div>
             )}
