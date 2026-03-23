@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
+import { Loader2 } from "lucide-react";
 
 interface GrammarPoint {
   sentence: string;
@@ -31,8 +32,10 @@ export default function InteractiveArticle({
   onSelection
 }: InteractiveArticleProps) {
   const articleRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playingParaIndex, setPlayingParaIndex] = useState<number | null>(null);
   const [currentWordIndex, setCurrentWordIndex] = useState<number | null>(null);
+  const [isCloudLoading, setIsCloudLoading] = useState(false);
 
   // Handle Text Selection
   useEffect(() => {
@@ -55,47 +58,85 @@ export default function InteractiveArticle({
     return () => {
       if (node) node.removeEventListener("mouseup", handleMouseUp);
       window.speechSynthesis.cancel();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
     };
   }, [onSelection]);
 
   // TTS Read-along Function
-  const playParagraph = (text: string, paraIdx: number) => {
-    window.speechSynthesis.cancel(); // Stop current playing
+  const playParagraph = async (text: string, paraIdx: number) => {
+    // 1. Stop any currently playing
+    stopPlaying();
     
-    // We roughly tokenize text by words for highlighting map
-    // TTS onboundary gives charIndex, we will map it to word index
+    // 2. Determine if it's Cloud or Local
+    const isCloud = selectedVoiceUri?.startsWith("cloud:");
+
+    if (isCloud) {
+       setIsCloudLoading(true);
+       setPlayingParaIndex(paraIdx);
+       try {
+         const voiceName = selectedVoiceUri?.replace("cloud:", "");
+         const res = await fetch("/api/tts", {
+           method: "POST",
+           headers: { "Content-Type": "application/json" },
+           body: JSON.stringify({ text, voice: voiceName })
+         });
+         
+         if (!res.ok) throw new Error("Cloud TTS Failed");
+         
+         const { audioContent } = await res.json();
+         const audioBlob = new Blob(
+           [Uint8Array.from(atob(audioContent), c => c.charCodeAt(0))],
+           { type: "audio/mp3" }
+         );
+         const audioUrl = URL.createObjectURL(audioBlob);
+         
+         const audio = new Audio(audioUrl);
+         audioRef.current = audio;
+         audio.playbackRate = playbackSpeed;
+         
+         audio.onended = () => {
+            stopPlaying();
+            URL.revokeObjectURL(audioUrl);
+         };
+         
+         await audio.play();
+         setIsCloudLoading(false);
+       } catch (err) {
+         console.error(err);
+         setIsCloudLoading(false);
+         setPlayingParaIndex(null);
+       }
+       return;
+    }
+
+    // --- Local Web Speech API Fallback ---
     const utterance = new SpeechSynthesisUtterance(text);
-    
-    // Attempt to select a better Google or native English voice
     const voices = window.speechSynthesis.getVoices();
-    
     let enVoice;
+    
     if (selectedVoiceUri) {
        enVoice = voices.find(v => v.voiceURI === selectedVoiceUri);
     }
     
     if (!enVoice) {
-      // Fallback prioritized list
       enVoice = voices.find(v => (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Online')) && v.lang.startsWith('en'))
              || voices.find(v => v.lang.startsWith('en-US')) 
              || voices.find(v => v.lang.startsWith('en'));
     }
                  
-    if (enVoice) {
-      utterance.voice = enVoice;
-    }
+    if (enVoice) utterance.voice = enVoice;
     
-    // Slight tuning to pitch and rate can make default voices sound slightly more natural
     utterance.pitch = 1.1; 
     utterance.lang = "en-US";
     utterance.rate = playbackSpeed;
-    utterance.volume = 1;
 
     setPlayingParaIndex(paraIdx);
     setCurrentWordIndex(0);
 
-    let words = text.split(/(\\s+)/); // split by keeping whitespaces so we can render them properly
-    // To map char index to word piece index:
+    let words = text.split(/(\s+)/);
     let charCounts: number[] = [];
     let currentLength = 0;
     words.forEach(w => {
@@ -105,33 +146,26 @@ export default function InteractiveArticle({
 
     utterance.onboundary = (event) => {
       if (event.name === "word") {
-        // find which word index this charIndex falls into
         const wIdx = charCounts.findIndex(c => c >= event.charIndex);
-        if (wIdx !== -1) {
-            // Check if we hit whitespace, push index forward if needed
-            setCurrentWordIndex(wIdx);
-        }
+        if (wIdx !== -1) setCurrentWordIndex(wIdx);
       }
     };
 
-    utterance.onend = () => {
-      setPlayingParaIndex(null);
-      setCurrentWordIndex(null);
-    };
-    
-    utterance.onerror = (e) => {
-      console.warn("Speech Synthesis Error:", e);
-      setPlayingParaIndex(null);
-      setCurrentWordIndex(null);
-    };
+    utterance.onend = () => stopPlaying();
+    utterance.onerror = () => stopPlaying();
 
     window.speechSynthesis.speak(utterance);
   };
 
   const stopPlaying = () => {
     window.speechSynthesis.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
     setPlayingParaIndex(null);
     setCurrentWordIndex(null);
+    setIsCloudLoading(false);
   };
 
   // Helper to render text with grammar tooltips
@@ -202,9 +236,12 @@ export default function InteractiveArticle({
             {/* Play Button - responsive positioning */}
             <div className="absolute -left-12 lg:-left-10 top-1 hidden lg:block opacity-0 group-hover:opacity-100 transition-opacity">
               <button 
+                disabled={isCloudLoading && isPlaying}
                 onClick={() => isPlaying ? stopPlaying() : playParagraph(para.english, idx)}
-                className="p-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-indigo-600 dark:hover:text-indigo-400">
-                {isPlaying ? (
+                className="p-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-50">
+                {isCloudLoading && isPlaying ? (
+                   <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+                ) : isPlaying ? (
                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
                 ) : (
                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -215,9 +252,12 @@ export default function InteractiveArticle({
             {/* Mobile Play Button - shown inline */}
             <div className="lg:hidden flex items-center gap-2 mb-1">
                <button 
+                disabled={isCloudLoading && isPlaying}
                 onClick={() => isPlaying ? stopPlaying() : playParagraph(para.english, idx)}
-                className="flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
-                {isPlaying ? (
+                className="flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 disabled:opacity-50">
+                {isCloudLoading && isPlaying ? (
+                   <><Loader2 className="w-3 h-3 animate-spin" /> Preparing...</>
+                ) : isPlaying ? (
                    <><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Stop</>
                 ) : (
                    <><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Listen</>

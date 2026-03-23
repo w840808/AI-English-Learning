@@ -67,9 +67,21 @@ export default function ReaderApp() {
   const [savedWords, setSavedWords] = useState<any[]>([]);
   const [savedArticles, setSavedArticles] = useState<any[]>([]);
 
+  // Predefined Premium Cloud Voices
+  const GOOGLE_NEURAL2_VOICES = [
+    { id: "en-US-Neural2-A", name: "Premium Female A (Soft)" },
+    { id: "en-US-Neural2-C", name: "Premium Female C (Clear)" },
+    { id: "en-US-Neural2-D", name: "Premium Male D (Deep)" },
+    { id: "en-US-Neural2-F", name: "Premium Female F (Warm)" },
+    { id: "en-US-Neural2-G", name: "Premium Female G (Smooth)" },
+    { id: "en-US-Neural2-H", name: "Premium Female H (Friendly)" },
+    { id: "en-US-Neural2-I", name: "Premium Male I (Natural)" },
+    { id: "en-US-Neural2-J", name: "Premium Male J (Direct)" },
+  ];
+
   // TTS Voice State
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [selectedVoiceUri, setSelectedVoiceUri] = useState<string>("");
+  const [selectedVoiceUri, setSelectedVoiceUri] = useState<string>("cloud:en-US-Neural2-D");
 
   useEffect(() => {
     const loadVoices = () => {
@@ -77,11 +89,9 @@ export default function ReaderApp() {
       const enVoices = voices.filter(v => v.lang.startsWith('en'));
       setAvailableVoices(enVoices);
       
+      // If none selected, we default to Neural2-D as first choice
       if (!selectedVoiceUri && enVoices.length > 0) {
-         const goodVoice = enVoices.find(v => (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Online')) && v.lang.startsWith('en'))
-             || enVoices.find(v => v.lang.startsWith('en-US')) 
-             || enVoices[0];
-         if (goodVoice) setSelectedVoiceUri(goodVoice.voiceURI);
+         setSelectedVoiceUri("cloud:en-US-Neural2-D");
       }
     };
 
@@ -371,13 +381,20 @@ export default function ReaderApp() {
           
           <div className="space-y-2">
              <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Voice Engine</label>
-             <select value={selectedVoiceUri} onChange={e => setSelectedVoiceUri(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[200px]" title={availableVoices.find(v => v.voiceURI === selectedVoiceUri)?.name}>
-               {availableVoices.length === 0 && <option value="">Loading voices...</option>}
-               {availableVoices.map((voice) => (
-                 <option key={voice.voiceURI} value={voice.voiceURI}>
-                   {voice.name.replace('Microsoft', 'MS').replace('Google', 'G-')}
-                 </option>
-               ))}
+             <select value={selectedVoiceUri} onChange={e => setSelectedVoiceUri(e.target.value)} className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[200px]">
+               <optgroup label="Premium Cloud (Neural2)">
+                 {GOOGLE_NEURAL2_VOICES.map(v => (
+                   <option key={v.id} value={`cloud:${v.id}`}>{v.name}</option>
+                 ))}
+               </optgroup>
+               <optgroup label="Standard Local (Browser)">
+                 {availableVoices.length === 0 && <option value="">Loading local...</option>}
+                 {availableVoices.map((voice) => (
+                   <option key={voice.voiceURI} value={voice.voiceURI}>
+                     {voice.name.replace('Microsoft', 'MS').replace('Google', 'G-')}
+                   </option>
+                 ))}
+               </optgroup>
              </select>
           </div>
           </>
