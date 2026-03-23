@@ -86,26 +86,43 @@ export default function InteractiveArticle({
          
          if (!res.ok) throw new Error("Cloud TTS Failed");
          
-         const { audioContent } = await res.json();
-         const audioBlob = new Blob(
-           [Uint8Array.from(atob(audioContent), c => c.charCodeAt(0))],
-           { type: "audio/mp3" }
-         );
+         const { audioContent, error } = await res.json();
+         if (error) throw new Error(error);
+         
+         if (!audioContent) throw new Error("No audio content received from API");
+
+         console.log("Audio content received, creating blob...");
+         const binaryString = atob(audioContent);
+         const bytes = new Uint8Array(binaryString.length);
+         for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+         }
+         
+         const audioBlob = new Blob([bytes], { type: "audio/mp3" });
          const audioUrl = URL.createObjectURL(audioBlob);
          
+         console.log("Audio URL created, starting playback...");
          const audio = new Audio(audioUrl);
          audioRef.current = audio;
          audio.playbackRate = playbackSpeed;
          
          audio.onended = () => {
+            console.log("Playback ended");
             stopPlaying();
             URL.revokeObjectURL(audioUrl);
          };
          
+         audio.onerror = (e) => {
+            console.error("Audio Playback Error:", e);
+            alert("播放失敗: 音訊格式錯誤或載入失敗");
+            stopPlaying();
+         };
+         
          await audio.play();
          setIsCloudLoading(false);
-       } catch (err) {
-         console.error(err);
+       } catch (err: any) {
+         console.error("Cloud TTS Playback Error:", err);
+         alert(`語音合成失敗: ${err.message}\n請檢查 Google Cloud Console 端的 API 是否已啟用，或 API Key 是否正確。`);
          setIsCloudLoading(false);
          setPlayingParaIndex(null);
        }
