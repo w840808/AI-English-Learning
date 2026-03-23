@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     `;
 
     const result = await generateObject({
-      model: google('gemini-3.1-flash'),
+      model: google('gemini-3.1-flash-lite-preview'),
       schema: ArticleSchema,
       prompt: prompt,
     });
