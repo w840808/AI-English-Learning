@@ -104,14 +104,30 @@ export default function InteractiveArticle({
          audioRef.current = audio;
          audio.playbackRate = playbackSpeed;
 
-         // Estimated word highlighting for Cloud TTS
+         // --- Enhanced Word Highlighting for Cloud TTS ---
          const tokens = text.split(/(\s+)/);
+         const totalChars = text.length;
+         let cumulativeLength = 0;
+         const tokenStartOffsets = tokens.map(t => {
+           const start = cumulativeLength;
+           cumulativeLength += t.length;
+           return start;
+         });
+
          audio.ontimeupdate = () => {
-           if (!audio.duration) return;
-           const progress = audio.currentTime / audio.duration;
-           const targetTokenIndex = Math.floor(progress * tokens.length);
-           if (targetTokenIndex !== currentWordIndex) {
-             setCurrentWordIndex(targetTokenIndex);
+           if (!audio.duration || audio.duration === 0) return;
+           
+           // Use character-based progress for much better alignment
+           const currentPos = (audio.currentTime / audio.duration) * totalChars;
+           
+           // Find the token whose range contains the current estimated character position
+           let targetIdx = tokenStartOffsets.findIndex((offset, i) => {
+              const nextOffset = tokenStartOffsets[i+1] || totalChars;
+              return currentPos >= offset && currentPos < nextOffset;
+           });
+
+           if (targetIdx !== -1 && targetIdx !== currentWordIndex) {
+              setCurrentWordIndex(targetIdx);
            }
          };
          

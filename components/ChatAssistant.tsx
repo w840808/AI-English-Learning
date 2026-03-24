@@ -67,8 +67,7 @@ export default function ChatAssistant({ articleTitle, articleContent }: ChatAssi
           if (done) break;
           
           const chunk = decoder.decode(value, { stream: true });
-          // The API now uses toTextStreamResponse(), which sends raw text chunks.
-          // We don't need complex parsing for standard text streams.
+          // Directly append raw text from toTextStreamResponse()
           assistantContent += chunk;
           setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: assistantContent } : m));
         }

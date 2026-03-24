@@ -1,35 +1,39 @@
 import { google } from '@ai-sdk/google';
 import { streamText } from 'ai';
 
-// Use a stable model with high quota for chat
-const model = google('gemini-2.0-flash');
+export const maxDuration = 30;
 
 export async function POST(req: Request) {
-  const { messages, articleContext } = await req.json();
+  try {
+    const { messages, articleContext } = await req.json();
 
-  const systemPrompt = `
+    const systemPrompt = `
 You are an AI English Learning Assistant for the "AI English Radio" app. 
-Your goal is to help users understand the current English article and improve their English skills.
-
-${articleContext ? `The user is currently reading this article:
----
-TITLE: ${articleContext.title}
-CONTENT: ${articleContext.content}
----` : 'The user has not generated an article yet.'}
+Help the user understand the article:
+Title: ${articleContext?.title || "Unknown"}
+Content: ${articleContext?.content || "No content"}
 
 Guidelines:
-1. Be encouraging, patient, and professional.
-2. If the user asks about a word or sentence in the article, provide detailed explanations including grammar, usage, and synonyms.
-3. If appropriate, suggest how they can rephrase their questions in better English.
-4. Keep responses concise but highly educational.
-5. Use traditional Chinese (繁體中文) for explanations when asked or when explaining to a Chinese-speaking user.
+1. Use Traditional Chinese (繁體中文) for explanations.
+2. Be educational and concise.
 `;
 
-  const result = await streamText({
-    model,
-    system: systemPrompt,
-    messages,
-  });
+    const result = await streamText({
+      model: google('gemini-2.0-flash'),
+      system: systemPrompt,
+      messages: messages.map((m: any) => ({
+        role: m.role,
+        content: m.content,
+      })),
+    });
 
-  return result.toTextStreamResponse();
+    // Use toTextStreamResponse for raw text delivery, most reliable for manual fetch
+    return result.toTextStreamResponse();
+  } catch (error: any) {
+    console.error("Chat API Error:", error);
+    return new Response(JSON.stringify({ error: error.message }), { 
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
 }
