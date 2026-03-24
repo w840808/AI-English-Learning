@@ -39,7 +39,15 @@ export async function POST(req: Request) {
       prompt: prompt,
     });
 
-    return new Response(JSON.stringify(result.object), {
+    const objectToReturn = result.object || {
+        wordOrPhrase: selection,
+        ipa: "",
+        pos: "",
+        definition: "無法獲取定義 (API 額度限制)",
+        usage_in_context: "請稍候再試"
+    };
+
+    return new Response(JSON.stringify(objectToReturn), {
         headers: { "Content-Type": "application/json" }
     });
 

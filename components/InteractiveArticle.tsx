@@ -73,9 +73,11 @@ export default function InteractiveArticle({
     // 2. Determine if it's Cloud or Local
     const isCloud = selectedVoiceUri?.startsWith("cloud:");
 
+    setPlayingParaIndex(paraIdx);
+    setCurrentWordIndex(0);
+
     if (isCloud) {
        setIsCloudLoading(true);
-       setPlayingParaIndex(paraIdx);
        try {
          const voiceName = selectedVoiceUri?.replace("cloud:", "");
          const res = await fetch("/api/tts", {
@@ -85,16 +87,11 @@ export default function InteractiveArticle({
          });
          
          const responseData = await res.json();
-         
-         if (!res.ok) {
-           throw new Error(responseData.error || responseData.details?.error?.message || "Cloud TTS API 請求失敗");
-         }
+         if (!res.ok) throw new Error(responseData.error || "Cloud TTS 請求失敗");
          
          const { audioContent } = responseData;
-         
-         if (!audioContent) throw new Error("No audio content received from API");
+         if (!audioContent) throw new Error("No audio content");
 
-         console.log("Audio content received, creating blob...");
          const binaryString = atob(audioContent);
          const bytes = new Uint8Array(binaryString.length);
          for (let i = 0; i < binaryString.length; i++) {
@@ -103,26 +100,32 @@ export default function InteractiveArticle({
          
          const audioBlob = new Blob([bytes], { type: "audio/mp3" });
          const audioUrl = URL.createObjectURL(audioBlob);
-         
-         console.log("Audio URL created, starting playback...");
          const audio = new Audio(audioUrl);
          audioRef.current = audio;
          audio.playbackRate = playbackSpeed;
+
+         // Estimated word highlighting for Cloud TTS
+         const tokens = text.split(/(\s+)/);
+         audio.ontimeupdate = () => {
+           if (!audio.duration) return;
+           const progress = audio.currentTime / audio.duration;
+           const targetTokenIndex = Math.floor(progress * tokens.length);
+           if (targetTokenIndex !== currentWordIndex) {
+             setCurrentWordIndex(targetTokenIndex);
+           }
+         };
          
          audio.onended = () => {
             stopPlaying();
             URL.revokeObjectURL(audioUrl);
          };
          
-         audio.onerror = (e) => {
-            console.error("Audio Playback Error:", e);
-            stopPlaying();
-         };
+         audio.onerror = () => stopPlaying();
          
          await audio.play();
          setIsCloudLoading(false);
-       } catch (err: any) {
-         console.error("Cloud TTS Playback Error:", err);
+       } catch (err) {
+         console.error("Cloud TTS Error:", err);
          setIsCloudLoading(false);
          setPlayingParaIndex(null);
        }
@@ -132,31 +135,19 @@ export default function InteractiveArticle({
     // --- Local Web Speech API Fallback ---
     const utterance = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
-    let enVoice;
-    
-    if (selectedVoiceUri) {
-       enVoice = voices.find(v => v.voiceURI === selectedVoiceUri);
-    }
+    let enVoice = voices.find(v => v.voiceURI === selectedVoiceUri);
     
     if (!enVoice) {
-      enVoice = voices.find(v => (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Online')) && v.lang.startsWith('en'))
-             || voices.find(v => v.lang.startsWith('en-US')) 
-             || voices.find(v => v.lang.startsWith('en'));
+      enVoice = voices.find(v => v.lang.startsWith('en-US')) || voices.find(v => v.lang.startsWith('en'));
     }
                  
     if (enVoice) utterance.voice = enVoice;
-    
-    utterance.pitch = 1.1; 
-    utterance.lang = "en-US";
     utterance.rate = playbackSpeed;
 
-    setPlayingParaIndex(paraIdx);
-    setCurrentWordIndex(0);
-
-    let words = text.split(/(\s+)/);
+    const tokens = text.split(/(\s+)/);
     let charCounts: number[] = [];
     let currentLength = 0;
-    words.forEach(w => {
+    tokens.forEach(w => {
       charCounts.push(currentLength);
       currentLength += w.length;
     });
@@ -170,7 +161,6 @@ export default function InteractiveArticle({
 
     utterance.onend = () => stopPlaying();
     utterance.onerror = () => stopPlaying();
-
     window.speechSynthesis.speak(utterance);
   };
 
@@ -211,10 +201,10 @@ export default function InteractiveArticle({
           const parts = seg.text.split(point.sentence);
           let currentSegOffset = seg.start;
           for (let i = 0; i < parts.length; i++) {
-            if (parts[i]) {
-              newSegments.push({ text: parts[i], grammarIdx: null, start: currentSegOffset, end: currentSegOffset + parts[i].length });
-              currentSegOffset += parts[i].length;
-            }
+            // Even if parts[i] is empty, we must add it to maintain segment boundaries
+            newSegments.push({ text: parts[i], grammarIdx: null, start: currentSegOffset, end: currentSegOffset + parts[i].length });
+            currentSegOffset += parts[i].length;
+            
             if (i < parts.length - 1) {
               newSegments.push({ text: point.sentence, grammarIdx: gIdx, start: currentSegOffset, end: currentSegOffset + point.sentence.length });
               currentSegOffset += point.sentence.length;
@@ -316,7 +306,15 @@ export default function InteractiveArticle({
             </div>
 
             {/* English Side */}
-            <div className={`font-serif text-zinc-900 dark:text-zinc-100 leading-relaxed text-base md:text-lg`}>
+            <div 
+              onMouseUp={() => {
+                const selection = window.getSelection();
+                if (selection && selection.toString().trim()) {
+                   onSelection?.(selection.toString().trim());
+                }
+              }}
+              className={`font-serif text-zinc-900 dark:text-zinc-100 leading-relaxed text-base md:text-lg`}
+            >
               {renderAnnotatedText(para.english, idx)}
             </div>
 
