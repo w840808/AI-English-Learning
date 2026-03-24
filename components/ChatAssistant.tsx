@@ -53,25 +53,12 @@ export default function ChatAssistant({ articleTitle, articleContent }: ChatAssi
 
       if (!response.ok) throw new Error("Chat failed");
 
-      // Handle streaming response
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let assistantContent = "";
+      const data = await response.json();
+      const assistantContent = data.text || (data.error ? `Error: ${data.error}` : "Sorry, I couldn't generate a response.");
       
       const assistantId = "assistant-" + Date.now();
-      setMessages(prev => [...prev, { id: assistantId, role: "assistant", content: "" }]);
+      setMessages(prev => [...prev, { id: assistantId, role: "assistant", content: assistantContent }]);
 
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          const chunk = decoder.decode(value, { stream: true });
-          // Directly append raw text from toTextStreamResponse()
-          assistantContent += chunk;
-          setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: assistantContent } : m));
-        }
-      }
     } catch (error) {
       console.error("Chat Error:", error);
       setMessages(prev => [...prev, { id: "error", role: "assistant", content: "Sorry, I'm having trouble connecting right now. 請稍候再試。" }]);

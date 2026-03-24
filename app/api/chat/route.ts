@@ -1,11 +1,18 @@
-import { google } from '@ai-sdk/google';
-import { streamText } from 'ai';
-
-export const maxDuration = 30;
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { generateText } from 'ai';
 
 export async function POST(req: Request) {
   try {
     const { messages, articleContext } = await req.json();
+    
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: "GEMINI_API_KEY not found" }), { status: 500 });
+    }
+
+    const google = createGoogleGenerativeAI({
+      apiKey: apiKey,
+    });
 
     const systemPrompt = `
 You are an AI English Learning Assistant for the "AI English Radio" app. 
@@ -18,7 +25,8 @@ Guidelines:
 2. Be educational and concise.
 `;
 
-    const result = await streamText({
+    // Switch to generateText (Non-streaming) for maximum reliability
+    const { text } = await generateText({
       model: google('gemini-2.0-flash'),
       system: systemPrompt,
       messages: messages.map((m: any) => ({
@@ -27,8 +35,12 @@ Guidelines:
       })),
     });
 
-    // Use toTextStreamResponse for raw text delivery, most reliable for manual fetch
-    return result.toTextStreamResponse();
+    console.log("AI Assistant Response Generated Successfully");
+    
+    return new Response(JSON.stringify({ text }), { 
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
   } catch (error: any) {
     console.error("Chat API Error:", error);
     return new Response(JSON.stringify({ error: error.message }), { 
