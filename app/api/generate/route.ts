@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     // Use the latest and fastest model with Google Search grounding
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
-      tools: [{ googleSearchRetrieval: {} }]
+      tools: [{ google_search: {} }] as any
     });
 
     const keywordInstruction = keywords && keywords.trim().length > 0 
