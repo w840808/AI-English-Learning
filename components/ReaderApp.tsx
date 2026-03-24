@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { BookOpen, Settings, PlayCircle, Loader2, BookMarked, X, LogOut, User, Menu, ChevronLeft, ChevronRight } from "lucide-react";
 import InteractiveArticle from "./InteractiveArticle";
+import ChatAssistant from "./ChatAssistant";
 import { createSupabaseClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -685,6 +686,10 @@ export default function ReaderApp() {
         </div>
       </aside>
 
+      <ChatAssistant 
+        articleTitle={articleData?.title} 
+        articleContent={articleData?.paragraphs?.map((p: any) => p.english).join("\n\n")} 
+      />
     </div>
   );
 }

@@ -185,59 +185,92 @@ export default function InteractiveArticle({
     setIsCloudLoading(false);
   };
 
-  // Helper to render text with grammar tooltips
+  // Helper to render text with grammar tooltips AND sync highlights
   const renderAnnotatedText = (text: string, paraIdx: number) => {
-    let result: React.ReactNode[] = [text];
+    // 1. Split text into words and non-word characters for exact mapping
+    // We use a regex that captures words vs non-words to maintain indices
+    const tokens: string[] = text.split(/(\s+)/);
+    
+    // Calculate character offsets for each token
+    let offset = 0;
+    const tokenOffsets = tokens.map(t => {
+      const start = offset;
+      offset += t.length;
+      return { start, end: offset };
+    });
 
-    grammarPoints.forEach((point, pointIdx) => {
-      let newResult: React.ReactNode[] = [];
-      result.forEach((chunk, chunkIdx) => {
-        if (typeof chunk === "string") {
-          const parts = chunk.split(point.sentence);
+    const isPlayingPara = playingParaIndex === paraIdx;
+
+    // First, identify which parts are grammar points
+    let segments: { text: string; grammarIdx: number | null; start: number; end: number }[] = [{ text, grammarIdx: null, start: 0, end: text.length }];
+
+    grammarPoints.forEach((point, gIdx) => {
+      const newSegments: typeof segments = [];
+      segments.forEach(seg => {
+        if (seg.grammarIdx === null && seg.text.includes(point.sentence)) {
+          const parts = seg.text.split(point.sentence);
+          let currentSegOffset = seg.start;
           for (let i = 0; i < parts.length; i++) {
-            newResult.push(parts[i]);
+            if (parts[i]) {
+              newSegments.push({ text: parts[i], grammarIdx: null, start: currentSegOffset, end: currentSegOffset + parts[i].length });
+              currentSegOffset += parts[i].length;
+            }
             if (i < parts.length - 1) {
-              newResult.push(
-                <Tooltip.Provider key={`tooltip-${pointIdx}-${i}`}>
-                  <Tooltip.Root delayDuration={200}>
-                    <Tooltip.Trigger asChild>
-                      <span className="underline decoration-indigo-400 decoration-dotted decoration-2 cursor-help text-indigo-900 dark:text-indigo-300">
-                        {point.sentence}
-                      </span>
-                    </Tooltip.Trigger>
-                    <Tooltip.Portal>
-                      <Tooltip.Content 
-                        className="max-w-xs bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-900 text-sm p-3 rounded shadow-lg z-50 font-sans" 
-                        sideOffset={5}>
-                        {point.explanation}
-                        <Tooltip.Arrow className="fill-zinc-900 dark:fill-zinc-100" />
-                      </Tooltip.Content>
-                    </Tooltip.Portal>
-                  </Tooltip.Root>
-                </Tooltip.Provider>
-              );
+              newSegments.push({ text: point.sentence, grammarIdx: gIdx, start: currentSegOffset, end: currentSegOffset + point.sentence.length });
+              currentSegOffset += point.sentence.length;
             }
           }
         } else {
-          newResult.push(chunk);
+          newSegments.push(seg);
         }
       });
-      result = newResult;
+      segments = newSegments;
     });
 
-    // If this paragraph is playing, we ignore grammar tooltip injection and just render words
-    // to avoid complex DOM conflicts with TTS highlighting for now. 
-    // In a fully robust version, we'd merge them.
-    if (playingParaIndex === paraIdx) {
-      const tokens = text.split(/(\\s+)/);
-      return tokens.map((token, idx) => (
-        <span key={idx} className={currentWordIndex === idx ? "bg-yellow-200 dark:bg-yellow-900/50 rounded" : ""}>
-          {token}
-        </span>
-      ));
-    }
+    // Now render each segment, and within each segment, render tokens if we are playing
+    return segments.map((seg, sIdx) => {
+      const content = tokens.map((token, tIdx) => {
+        const tOffset = tokenOffsets[tIdx];
+        // If token is within this segment
+        if (tOffset.start >= seg.start && tOffset.end <= seg.end) {
+          const isHighlighted = isPlayingPara && currentWordIndex === tIdx;
+          return (
+            <span 
+              key={`tok-${tIdx}`} 
+              className={`${isHighlighted ? "bg-yellow-200 dark:bg-yellow-900/60 rounded px-0.5 transition-colors duration-150" : ""} selection:bg-indigo-300 dark:selection:bg-indigo-800`}
+            >
+              {token}
+            </span>
+          );
+        }
+        return null;
+      }).filter(Boolean);
 
-    return result;
+      if (seg.grammarIdx !== null) {
+        const point = grammarPoints[seg.grammarIdx];
+        return (
+          <Tooltip.Provider key={`seg-${sIdx}`}>
+            <Tooltip.Root delayDuration={200}>
+              <Tooltip.Trigger asChild>
+                <span className="underline decoration-indigo-400 decoration-dotted decoration-2 cursor-help text-indigo-900 dark:text-indigo-300">
+                  {content}
+                </span>
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Content 
+                  className="max-w-xs bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-900 text-sm p-3 rounded shadow-lg z-50 font-sans bounce-in" 
+                  sideOffset={5}>
+                  {point.explanation}
+                  <Tooltip.Arrow className="fill-zinc-900 dark:fill-zinc-100" />
+                </Tooltip.Content>
+              </Tooltip.Portal>
+            </Tooltip.Root>
+          </Tooltip.Provider>
+        );
+      }
+
+      return <span key={`seg-${sIdx}`}>{content}</span>;
+    });
   };
 
   return (
