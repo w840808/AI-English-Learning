@@ -54,22 +54,31 @@ export async function POST(req: Request) {
 
     let result;
     try {
-        // Primary Attempt: 2.0-flash (Higher quota, latest features)
+        // 1. Primary: 2.0-flash
         result = await callModel("gemini-2.0-flash");
     } catch (error: any) {
-        // Check if error is 429 (Quota Exceeded)
         if (error.message?.includes("429") || error.status === 429) {
-            console.warn("Primary model (2.0-flash) rate limited. Falling back to flash-latest (1.5 Flash)...");
+            console.warn("2.0-flash limited, trying pro-latest...");
             try {
-                // Secondary Attempt: flash-latest (1.5 Flash)
-                result = await callModel("gemini-flash-latest");
-            } catch (fallbackError: any) {
-                console.warn("flash-latest failed, falling back to pro-latest (1.5 Pro)...");
+                // 2. Secondary: pro-latest (1.5 Pro)
+                result = await callModel("gemini-pro-latest");
+            } catch (err2: any) {
+                console.warn("pro-latest limited, trying flash-latest...");
                 try {
-                    // Tertiary Attempt: pro-latest (1.5 Pro)
-                    result = await callModel("gemini-pro-latest");
-                } catch (lastError: any) {
-                    throw lastError;
+                    // 3. Tertiary: flash-latest (1.5 Flash)
+                    result = await callModel("gemini-flash-latest");
+                } catch (err3: any) {
+                    console.warn("flash-latest limited, trying flash-lite-latest as last resort...");
+                    try {
+                        // 4. Quaternary: flash-lite-latest (Lite version)
+                        result = await callModel("gemini-flash-lite-latest");
+                    } catch (lastError: any) {
+                        // All models failed or reached quota
+                        const isQuota = lastError.message?.includes("429") || lastError.status === 429;
+                        return new Response(JSON.stringify({ 
+                            error: isQuota ? "目前 API 免費額度已達上限，請稍候 60 秒再試。 (All Models Rate Limited)" : lastError.message 
+                        }), { status: isQuota ? 429 : 500 });
+                    }
                 }
             }
         } else {
