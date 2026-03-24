@@ -49,12 +49,17 @@ export async function POST(req: Request) {
 
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-      }
     });
 
-    const responseText = result.response.text();
+    let responseText = result.response.text();
+    
+    // Manual JSON Cleanup: Remove markdown code blocks if present
+    if (responseText.includes("```json")) {
+        responseText = responseText.split("```json")[1].split("```")[0].trim();
+    } else if (responseText.includes("```")) {
+        responseText = responseText.split("```")[1].split("```")[0].trim();
+    }
+
     return new Response(responseText, {
         headers: { "Content-Type": "application/json" }
     });
