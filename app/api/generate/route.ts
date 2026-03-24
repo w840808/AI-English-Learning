@@ -59,15 +59,21 @@ export async function POST(req: Request) {
     } catch (error: any) {
         // Check if error is 429 (Quota Exceeded)
         if (error.message?.includes("429") || error.status === 429) {
-            console.warn("Primary model (2.5-flash) rate limited. Falling back to 1.5-pro...");
+            console.warn("Primary model (2.5-flash) rate limited. Falling back to 2.0-flash...");
             try {
-                // Secondary Attempt: 1.5-pro
-                result = await callModel("gemini-1.5-pro");
+                // Secondary Attempt: 2.0-flash
+                result = await callModel("gemini-2.0-flash");
             } catch (fallbackError: any) {
-                throw fallbackError; // Re-throw if fallback also fails
+                console.warn("2.0-flash failed, falling back to pro-latest...");
+                try {
+                    // Tertiary Attempt: pro-latest (1.5 Pro)
+                    result = await callModel("gemini-pro-latest");
+                } catch (lastError: any) {
+                    throw lastError;
+                }
             }
         } else {
-            throw error; // Re-throw if it's not a rate limit error
+            throw error;
         }
     }
 
