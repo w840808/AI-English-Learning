@@ -10,12 +10,6 @@ export async function POST(req: Request) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    // Use the latest and fastest model with Google Search grounding
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash",
-      tools: [{ google_search: {} }] as any
-    });
-
     const keywordInstruction = keywords && keywords.trim().length > 0 
         ? `Additionally, address the following specific themes, questions, or keywords directly: ${keywords}` 
         : "";
@@ -47,9 +41,35 @@ export async function POST(req: Request) {
       For the grammar_analysis portion, select 3 key grammatically interesting sentences from the English text exactly as they appear, and provide a detailed explanation in Traditional Chinese for each.
     `;
 
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-    });
+    // Helper function to call the model with specific tool configuration
+    const callModel = async (modelName: string) => {
+        const model = genAI.getGenerativeModel({ 
+            model: modelName,
+            tools: [{ google_search: {} }] as any
+        });
+        return await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+        });
+    };
+
+    let result;
+    try {
+        // Primary Attempt: 2.5-flash
+        result = await callModel("gemini-2.5-flash");
+    } catch (error: any) {
+        // Check if error is 429 (Quota Exceeded)
+        if (error.message?.includes("429") || error.status === 429) {
+            console.warn("Primary model (2.5-flash) rate limited. Falling back to 1.5-flash...");
+            try {
+                // Secondary Attempt: 1.5-flash
+                result = await callModel("gemini-1.5-flash");
+            } catch (fallbackError: any) {
+                throw fallbackError; // Re-throw if fallback also fails
+            }
+        } else {
+            throw error; // Re-throw if it's not a rate limit error
+        }
+    }
 
     let responseText = result.response.text();
     
