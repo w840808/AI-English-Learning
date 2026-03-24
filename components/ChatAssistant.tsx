@@ -66,22 +66,11 @@ export default function ChatAssistant({ articleTitle, articleContent }: ChatAssi
           const { done, value } = await reader.read();
           if (done) break;
           
-          const chunk = decoder.decode(value);
-          // Simple parsing for the data stream (standard AI SDK format sends content in parts)
-          // For simplicity in this robust version, we just append whatever comes back if it's text
-          // or handle the '0:"content"' format
-          const lines = chunk.split("\n");
-          for (const line of lines) {
-            if (line.startsWith('0:"')) {
-               const content = JSON.parse(`{"text":${line.substring(2)}}`).text;
-               assistantContent += content;
-               setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: assistantContent } : m));
-            } else if (!line.includes(':')) {
-               // Fallback for raw text if the SDK format is different
-               assistantContent += line;
-               setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: assistantContent } : m));
-            }
-          }
+          const chunk = decoder.decode(value, { stream: true });
+          // The API now uses toTextStreamResponse(), which sends raw text chunks.
+          // We don't need complex parsing for standard text streams.
+          assistantContent += chunk;
+          setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: assistantContent } : m));
         }
       }
     } catch (error) {

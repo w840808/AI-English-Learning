@@ -33,23 +33,39 @@ export async function POST(req: Request) {
       Output pure JSON.
     `;
 
-    const result = await generateObject({
-      model: google('gemini-2.0-flash'),
-      schema: DefinitionSchema,
-      prompt: prompt,
-    });
+    const models = ["gemini-2.0-flash", "gemini-pro-latest", "gemini-flash-latest"];
+    let lastError = null;
 
-    const objectToReturn = result.object || {
-        wordOrPhrase: selection,
-        ipa: "",
-        pos: "",
-        definition: "無法獲取定義 (API 額度限制)",
-        usage_in_context: "請稍候再試"
-    };
+    for (const modelName of models) {
+        try {
+            const result = await generateObject({
+                model: google(modelName),
+                schema: DefinitionSchema,
+                prompt: prompt,
+            });
 
-    return new Response(JSON.stringify(objectToReturn), {
-        headers: { "Content-Type": "application/json" }
-    });
+            const objectToReturn = result.object || {
+                wordOrPhrase: selection,
+                ipa: "",
+                pos: "",
+                definition: "無法獲取定義 (API 額度限制)",
+                usage_in_context: "請稍候再試"
+            };
+
+            return new Response(JSON.stringify(objectToReturn), {
+                headers: { "Content-Type": "application/json" }
+            });
+        } catch (error: any) {
+            console.warn(`Define API fallback from ${modelName}:`, error.message);
+            lastError = error;
+            if (error.status === 429 || error.message?.includes("quota")) {
+                continue;
+            }
+            break;
+        }
+    }
+
+    return new Response(JSON.stringify({ error: lastError?.message || "All models failed" }), { status: 500 });
 
   } catch (error: any) {
     console.error("Define API Error:", error);
