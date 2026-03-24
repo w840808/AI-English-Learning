@@ -54,28 +54,22 @@ export async function POST(req: Request) {
 
     let result;
     try {
-        // Primary Attempt: 2.5-flash
-        result = await callModel("gemini-2.5-flash");
+        // Primary Attempt: 2.0-flash (Higher quota, latest features)
+        result = await callModel("gemini-2.0-flash");
     } catch (error: any) {
         // Check if error is 429 (Quota Exceeded)
         if (error.message?.includes("429") || error.status === 429) {
-            console.warn("Primary model (2.5-flash) rate limited. Falling back to 2.0-flash...");
+            console.warn("Primary model (2.0-flash) rate limited. Falling back to flash-latest (1.5 Flash)...");
             try {
-                // Secondary Attempt: 2.0-flash
-                result = await callModel("gemini-2.0-flash");
+                // Secondary Attempt: flash-latest (1.5 Flash)
+                result = await callModel("gemini-flash-latest");
             } catch (fallbackError: any) {
-                console.warn("2.0-flash failed, falling back to pro-latest...");
+                console.warn("flash-latest failed, falling back to pro-latest (1.5 Pro)...");
                 try {
                     // Tertiary Attempt: pro-latest (1.5 Pro)
                     result = await callModel("gemini-pro-latest");
-                } catch (fallback2Error: any) {
-                    console.warn("Pro-latest failed, falling back to flash-latest (1.5 Flash)...");
-                    try {
-                        // Quaternary Attempt: flash-latest (1.5 Flash)
-                        result = await callModel("gemini-flash-latest");
-                    } catch (lastError: any) {
-                        throw lastError;
-                    }
+                } catch (lastError: any) {
+                    throw lastError;
                 }
             }
         } else {

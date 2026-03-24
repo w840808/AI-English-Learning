@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     `;
 
     const result = await generateObject({
-      model: google('gemini-2.5-flash'),
+      model: google('gemini-2.0-flash'),
       schema: DefinitionSchema,
       prompt: prompt,
     });
