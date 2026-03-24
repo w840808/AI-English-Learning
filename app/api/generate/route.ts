@@ -68,8 +68,14 @@ export async function POST(req: Request) {
                 try {
                     // Tertiary Attempt: pro-latest (1.5 Pro)
                     result = await callModel("gemini-pro-latest");
-                } catch (lastError: any) {
-                    throw lastError;
+                } catch (fallback2Error: any) {
+                    console.warn("Pro-latest failed, falling back to flash-latest (1.5 Flash)...");
+                    try {
+                        // Quaternary Attempt: flash-latest (1.5 Flash)
+                        result = await callModel("gemini-flash-latest");
+                    } catch (lastError: any) {
+                        throw lastError;
+                    }
                 }
             }
         } else {
